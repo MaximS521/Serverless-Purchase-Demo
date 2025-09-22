@@ -116,59 +116,63 @@ samples/
 }
 ```
 
-**Lambda #1 — Queue Consumer (SQS → DynamoDB)
-Function: lambda1-queue-consumer/main.py
+## 2) Lambda #1 — Queue Consumer (SQS → DynamoDB)
 
-Environment variables:
+**Function:** `lambda1-queue-consumer/main.py`
 
-AWS_REGION = e.g. us-east-1
+**Environment variables**
 
-TABLE_NAME = ProductPurchases
+- `AWS_REGION` – e.g., `us-east-1`
+- `TABLE_NAME` – e.g., `ProductPurchases`
 
-IAM permissions must include:
+**IAM permissions must include**
 
-dynamodb:PutItem on your table
+- `dynamodb:PutItem` on your DynamoDB table
+- CloudWatch Logs permissions (create log group/stream, put log events)
 
-CloudWatch Logs permissions
+**Event source mapping**
 
-Create an event source mapping (SQS trigger) from your queue to this function.
+Create an **SQS trigger** (event source mapping) from your queue to this function.
 
-3) API Gateway (REST)
-Create a resource /productpurchase.
+---
 
-Add a PUT method with Lambda proxy integration → Lambda #2.
+## 3) API Gateway (REST)
 
-Enable CORS for the resource/method (OPTIONS should be auto-created or added).
+1. Create a resource: `/productpurchase`.
+2. Add a **PUT** method with **Lambda proxy integration** → point it to **Lambda #2 (API Producer)**.
+3. **Enable CORS** for the resource & method (an `OPTIONS` method should be created automatically; if not, add it).
+4. **Deploy** to a stage, e.g., `dev`.
+5. Note the **Invoke URL**, e.g.:  
+   `https://YOUR_API_ID.execute-api.us-east-1.amazonaws.com/dev/productpurchase`
 
-Deploy to a stage (e.g. dev).
+---
 
-Note the Invoke URL (e.g. https://abc123.execute-api.us-east-1.amazonaws.com/dev/productpurchase).
+## 4) Frontend (S3 static website)
 
-4) Frontend (S3 static website)
-Create a bucket (e.g. product-purchase-form-XXXXXXXX) in your {REGION}.
+1. Create a bucket (e.g., `product-purchase-form-XXXXXXXX`) in your `{REGION}`.
+2. Enable **static website hosting**; set index to `index.html`.
+3. Allow **public read** to objects (bucket policy) – see `s3/frontend-bucket-policy.json` for a canonical pattern.
+4. Open `frontend/index.html` and set your API URL:
 
-Enable static website hosting; set index to index.html.
-
-Allow public read to objects (bucket policy) – see s3/frontend-bucket-policy.json for the canonical pattern.
-
-Open frontend/index.html and set:
-
-js
-Copy code
+```
 const API_URL = "https://YOUR_API_ID.execute-api.YOUR_REGION.amazonaws.com/dev/productpurchase";
+```
+
 Upload frontend/index.html to the bucket root.
 
 Visit the bucket website endpoint; submit a record from the page.
 
 5) Quick test (CLI)
-Use the sample body in samples/purchase.json:
+Use the sample body in samples/purchase.json.
+
+PowerShell:
 
 powershell
 Copy code
-$api = "https://YOUR_API_ID.execute-api.YOUR_REGION.amazonaws.com/dev/productpurchase"
+$api  = "https://YOUR_API_ID.execute-api.YOUR_REGION.amazonaws.com/dev/productpurchase"
 $body = Get-Content ./samples/purchase.json -Raw
 Invoke-WebRequest -Method Put -Uri $api -Body $body -ContentType 'application/json' |
-  Select-Object StatusCode,Content
+  Select-Object StatusCode, Content
 Then confirm in DynamoDB:
 
 powershell
@@ -183,39 +187,32 @@ lambda1-queue-consumer	TABLE_NAME	ProductPurchases
 
 Troubleshooting
 CORS errors in browser
-
 In API Gateway, ensure CORS is enabled for the resource and method.
 
-Lambda #2 returns CORS headers (Access-Control-Allow-Origin: *). Confirm they’re present on 2xx and on error.
+Lambda #2 returns CORS headers (Access-Control-Allow-Origin: *). Confirm they’re present on 2xx and error responses.
 
 S3 403 AccessDenied (website)
-
 Confirm bucket policy allows s3:GetObject on arn:aws:s3:::{BUCKET_NAME}/*.
 
 Confirm Block Public Access is disabled for this demo bucket.
 
 SQS trigger stuck in Creating
-
 Re-check permissions on Lambda #1’s execution role.
 
 Ensure the SQS queue is in the same region as the function.
 
 API 500 from Lambda #2
-
 Check CloudWatch Logs for stack traces.
 
 Verify the env variables (especially QUEUE_URL) are set.
 
 No rows in DynamoDB
-
 Open logs for Lambda #1; confirm the function is invoked by SQS.
 
 Validate the JSON you send (use the samples/purchase.json as a template).
 
 Cost & Cleanup
-Cost is typically pennies for a short demo:
-
-S3 (storage + website), API Gateway (invocations), Lambda (ms), SQS (requests), DynamoDB (writes).
+Cost is typically pennies for a short demo: S3 (storage + website), API Gateway (invocations), Lambda (ms), SQS (requests), DynamoDB (writes).
 
 Cleanup
 
@@ -223,7 +220,7 @@ Empty and delete the S3 bucket.
 
 Delete the API Gateway stage & API.
 
-Delete both Lambda functions and their IAM roles if dedicated.
+Delete both Lambda functions and their IAM roles (if dedicated to this demo).
 
 Delete the SQS queue and DynamoDB table.
 
@@ -232,4 +229,5 @@ Do not commit live ARNs, secrets, or credentials to this repository.
 
 Use least-privilege IAM policies.
 
-The sample public S3 policy is for demo/static assets only. Consider private hosting behind CloudFront for production.
+The sample public S3 policy is for demo/static assets only. For production, consider private hosting behind CloudFront.
+

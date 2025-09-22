@@ -1,29 +1,235 @@
-# Serverless Purchase Demo (Anonymized)
+# Serverless Purchase Demo
 
-A minimal serverless app:
-- **Frontend** (static S3 website) sends JSON to an API Gateway endpoint.
-- **Lambda #2 (API → SQS)** enqueues messages from the API.
-- **Lambda #1 (SQS → DynamoDB)** processes messages and writes them to a table.
+A minimal **serverless** app that demonstrates an event-driven pattern on AWS:
 
-> All cloud identifiers are placeholders:
+- **Frontend** (S3 static site) sends JSON to an **API Gateway** endpoint.
+- **Lambda (API → SQS)** enqueues messages from the API.
+- **Lambda (SQS → DynamoDB)** processes messages and writes them to a DynamoDB table.
+
+All cloud identifiers are **placeholders** and must be provided from your own AWS account:
 `{ACCOUNT_ID}`, `{REGION}`, `{BUCKET_NAME}`, `{QUEUE_ARN}`, `{QUEUE_URL}`, `{TABLE_ARN}`, `{APIGW_BASE_URL}`, `{APIGW_PATH}`.
 
+---
+
 ## Architecture
-Browser → API Gateway → Lambda #2 → SQS → Lambda #1 → DynamoDB
 
-## Configure for your account
-- **Frontend**
-  - `frontend/index.html`: set `API_BASE` to your API Gateway base URL and `API_PATH` to your resource path.
-- **Lambda #2 (API Producer)**
-  - `backend/lambda2-api-producer/main.py`: uses env vars `QUEUE_URL` and `AWS_REGION`.
-- **Lambda #1 (Queue Consumer)**
-  - `backend/lambda1-queue-consumer/main.py`: uses env vars `TABLE_NAME` and `AWS_REGION`.
-- **IAM policies**
-  - `infra/iam/lambda-policy.json`: replace `{ACCOUNT_ID}`, `{REGION}`, `{TABLE_NAME}`, `{QUEUE_NAME}` or set fully to your specific ARNs.
-- **S3 website**
-  - `infra/s3/frontend-bucket-policy.json`: set `{BUCKET_NAME}`.
-  - `infra/s3/site.json`: keeps the index document.
+Browser (S3 static website)
+└─> PUT {APIGW_BASE_URL}/{APIGW_PATH}
+└─> Amazon API Gateway (proxy)
+└─> Lambda #2: lambda2-api-producer (API → SQS)
+└─> Amazon SQS (queue)
+└─> Lambda #1: lambda1-queue-consumer (SQS → DynamoDB)
+└─> Amazon DynamoDB (table)
 
-## Notes
-- Do not put credentials or build artifacts in the repo.
-- Deployed S3 website and AWS resources live in your AWS account and are separate from this repo.
+
+**Data flow**  
+1. The web page calls API Gateway with a JSON payload.  
+2. Lambda #2 pushes the JSON into SQS.  
+3. Lambda #1 is triggered by SQS, validates the JSON and writes an item to DynamoDB.
+
+---
+
+## Repository Layout
+
+backend/
+lambda1-queue-consumer/ # SQS → DynamoDB
+└─ main.py
+lambda2-api-producer/ # API → SQS
+└─ main.py
+frontend/
+└─ index.html # Static site (S3)
+infra/
+iam/
+├─ lambda-policy.json # example IAM policy (reference)
+└─ trust-lambda.json # example trust policy (reference)
+s3/
+├─ frontend-bucket-policy.json # example public read (reference)
+└─ site.json # S3 website config (index suffix)
+samples/
+└─ purchase.json # example request body
+
+**Note**  
+> The files under `infra/` and `s3/` are **examples** meant to guide your config.  
+> You’ll still create resources in your own account (via console or CLI) and plug in your real ARNs/URLs.
+
+---
+
+## Prerequisites
+
+- AWS account with permissions to create S3, SQS, DynamoDB, Lambda, and API Gateway.
+- [AWS CLI v2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) configured (e.g. `aws configure`).
+- Python 3.11+ runtime available for Lambda packaging (if you zip locally).
+- A terminal (PowerShell or bash). The snippets below are PowerShell-style; shell equivalents are trivial.
+
+---
+
+## 1) Create core resources
+
+### DynamoDB
+- **Table name**: `ProductPurchases`
+- **Partition key**: `ProductPurchaseKey` (String)
+- Billing: On-demand is fine for demos.
+
+### SQS
+- **Queue name**: e.g. `ProductPurchasesDataQueue`
+- Copy the **Queue URL** and **Queue ARN**.
+
+---
+
+## 2) Deploy back-end Lambdas
+
+### Lambda #2 — API Producer (API → SQS)
+**Function**: `lambda2-api-producer/main.py`
+- Environment variables:
+  - `AWS_REGION` = your region, e.g. `us-east-1`
+  - `QUEUE_URL` = your SQS URL
+- IAM permissions must include:
+  - `sqs:SendMessage` on your queue
+  - CloudWatch Logs permissions
+
+**Example trust policy** (attach to the role used by this function):
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Effect": "Allow", "Principal": { "Service": "lambda.amazonaws.com" }, "Action": "sts:AssumeRole" }
+  ]
+}
+```
+
+**Example permission policy (replace placeholders with your real values):
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["sqs:SendMessage"],
+      "Resource": "arn:aws:sqs:{REGION}:{ACCOUNT_ID}:ProductPurchasesDataQueue"
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["logs:CreateLogGroup","logs:CreateLogStream","logs:PutLogEvents"],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+**Lambda #1 — Queue Consumer (SQS → DynamoDB)
+Function: lambda1-queue-consumer/main.py
+
+Environment variables:
+
+AWS_REGION = e.g. us-east-1
+
+TABLE_NAME = ProductPurchases
+
+IAM permissions must include:
+
+dynamodb:PutItem on your table
+
+CloudWatch Logs permissions
+
+Create an event source mapping (SQS trigger) from your queue to this function.
+
+3) API Gateway (REST)
+Create a resource /productpurchase.
+
+Add a PUT method with Lambda proxy integration → Lambda #2.
+
+Enable CORS for the resource/method (OPTIONS should be auto-created or added).
+
+Deploy to a stage (e.g. dev).
+
+Note the Invoke URL (e.g. https://abc123.execute-api.us-east-1.amazonaws.com/dev/productpurchase).
+
+4) Frontend (S3 static website)
+Create a bucket (e.g. product-purchase-form-XXXXXXXX) in your {REGION}.
+
+Enable static website hosting; set index to index.html.
+
+Allow public read to objects (bucket policy) – see s3/frontend-bucket-policy.json for the canonical pattern.
+
+Open frontend/index.html and set:
+
+js
+Copy code
+const API_URL = "https://YOUR_API_ID.execute-api.YOUR_REGION.amazonaws.com/dev/productpurchase";
+Upload frontend/index.html to the bucket root.
+
+Visit the bucket website endpoint; submit a record from the page.
+
+5) Quick test (CLI)
+Use the sample body in samples/purchase.json:
+
+powershell
+Copy code
+$api = "https://YOUR_API_ID.execute-api.YOUR_REGION.amazonaws.com/dev/productpurchase"
+$body = Get-Content ./samples/purchase.json -Raw
+Invoke-WebRequest -Method Put -Uri $api -Body $body -ContentType 'application/json' |
+  Select-Object StatusCode,Content
+Then confirm in DynamoDB:
+
+powershell
+Copy code
+aws dynamodb scan --table-name ProductPurchases --output table
+Environment variables (summary)
+Function	Variable	Example
+lambda2-api-producer	AWS_REGION	us-east-1
+lambda2-api-producer	QUEUE_URL	https://sqs.us-east-1.amazonaws.com/123/YourQ
+lambda1-queue-consumer	AWS_REGION	us-east-1
+lambda1-queue-consumer	TABLE_NAME	ProductPurchases
+
+Troubleshooting
+CORS errors in browser
+
+In API Gateway, ensure CORS is enabled for the resource and method.
+
+Lambda #2 returns CORS headers (Access-Control-Allow-Origin: *). Confirm they’re present on 2xx and on error.
+
+S3 403 AccessDenied (website)
+
+Confirm bucket policy allows s3:GetObject on arn:aws:s3:::{BUCKET_NAME}/*.
+
+Confirm Block Public Access is disabled for this demo bucket.
+
+SQS trigger stuck in Creating
+
+Re-check permissions on Lambda #1’s execution role.
+
+Ensure the SQS queue is in the same region as the function.
+
+API 500 from Lambda #2
+
+Check CloudWatch Logs for stack traces.
+
+Verify the env variables (especially QUEUE_URL) are set.
+
+No rows in DynamoDB
+
+Open logs for Lambda #1; confirm the function is invoked by SQS.
+
+Validate the JSON you send (use the samples/purchase.json as a template).
+
+Cost & Cleanup
+Cost is typically pennies for a short demo:
+
+S3 (storage + website), API Gateway (invocations), Lambda (ms), SQS (requests), DynamoDB (writes).
+
+Cleanup
+
+Empty and delete the S3 bucket.
+
+Delete the API Gateway stage & API.
+
+Delete both Lambda functions and their IAM roles if dedicated.
+
+Delete the SQS queue and DynamoDB table.
+
+Security Notes
+Do not commit live ARNs, secrets, or credentials to this repository.
+
+Use least-privilege IAM policies.
+
+The sample public S3 policy is for demo/static assets only. Consider private hosting behind CloudFront for production.

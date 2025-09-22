@@ -157,77 +157,29 @@ Create an **SQS trigger** (event source mapping) from your queue to this functio
 ```
 const API_URL = "https://YOUR_API_ID.execute-api.YOUR_REGION.amazonaws.com/dev/productpurchase";
 ```
+5.Upload frontend/index.html to the bucket root.
+6.Visit the bucket website endpoint; submit a record from the page.
 
-Upload frontend/index.html to the bucket root.
+---
+## Troubleshooting
 
-Visit the bucket website endpoint; submit a record from the page.
+### CORS errors in browser
+- In API Gateway, ensure **CORS** is enabled for the resource and method.
+- Lambda #2 returns CORS headers (e.g., `Access-Control-Allow-Origin: *`). Confirm they’re present on **2xx** and **error** responses.
 
-5) Quick test (CLI)
-Use the sample body in samples/purchase.json.
+### S3 `403 AccessDenied` (website)
+- Confirm bucket policy allows `s3:GetObject` on `arn:aws:s3:::{BUCKET_NAME}/*`.
+- Confirm **Block Public Access** is disabled for this demo bucket.
 
-PowerShell:
+### SQS trigger stuck in `Creating`
+- Re-check permissions on **Lambda #1’s** execution role.
+- Ensure the SQS queue is in the **same region** as the function.
 
-powershell
-Copy code
-$api  = "https://YOUR_API_ID.execute-api.YOUR_REGION.amazonaws.com/dev/productpurchase"
-$body = Get-Content ./samples/purchase.json -Raw
-Invoke-WebRequest -Method Put -Uri $api -Body $body -ContentType 'application/json' |
-  Select-Object StatusCode, Content
-Then confirm in DynamoDB:
+### API `500` from Lambda #2
+- Check **CloudWatch Logs** for stack traces.
+- Verify the env variables (especially `QUEUE_URL`) are set.
 
-powershell
-Copy code
-aws dynamodb scan --table-name ProductPurchases --output table
-Environment variables (summary)
-Function	Variable	Example
-lambda2-api-producer	AWS_REGION	us-east-1
-lambda2-api-producer	QUEUE_URL	https://sqs.us-east-1.amazonaws.com/123/YourQ
-lambda1-queue-consumer	AWS_REGION	us-east-1
-lambda1-queue-consumer	TABLE_NAME	ProductPurchases
-
-Troubleshooting
-CORS errors in browser
-In API Gateway, ensure CORS is enabled for the resource and method.
-
-Lambda #2 returns CORS headers (Access-Control-Allow-Origin: *). Confirm they’re present on 2xx and error responses.
-
-S3 403 AccessDenied (website)
-Confirm bucket policy allows s3:GetObject on arn:aws:s3:::{BUCKET_NAME}/*.
-
-Confirm Block Public Access is disabled for this demo bucket.
-
-SQS trigger stuck in Creating
-Re-check permissions on Lambda #1’s execution role.
-
-Ensure the SQS queue is in the same region as the function.
-
-API 500 from Lambda #2
-Check CloudWatch Logs for stack traces.
-
-Verify the env variables (especially QUEUE_URL) are set.
-
-No rows in DynamoDB
-Open logs for Lambda #1; confirm the function is invoked by SQS.
-
-Validate the JSON you send (use the samples/purchase.json as a template).
-
-Cost & Cleanup
-Cost is typically pennies for a short demo: S3 (storage + website), API Gateway (invocations), Lambda (ms), SQS (requests), DynamoDB (writes).
-
-Cleanup
-
-Empty and delete the S3 bucket.
-
-Delete the API Gateway stage & API.
-
-Delete both Lambda functions and their IAM roles (if dedicated to this demo).
-
-Delete the SQS queue and DynamoDB table.
-
-Security Notes
-Do not commit live ARNs, secrets, or credentials to this repository.
-
-Use least-privilege IAM policies.
-
-The sample public S3 policy is for demo/static assets only. For production, consider private hosting behind CloudFront.
-
+### No rows in DynamoDB
+- Open logs for **Lambda #1**; confirm the function is invoked by SQS.
+- Validate the JSON you send (use the `samples/purchase.json` template).
+---

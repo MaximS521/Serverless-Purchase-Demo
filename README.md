@@ -58,6 +58,7 @@ s3/
 
 samples/
 └── purchase.json                # example request body
+```
 
 **Note**  
 > The files under `infra/` and `s3/` are **examples** meant to guide your config.  
@@ -194,6 +195,7 @@ const API_URL = "https://YOUR_API_ID.execute-api.YOUR_REGION.amazonaws.com/dev/p
 - Open logs for **Lambda #1**; confirm the function is invoked by SQS.
 - Validate the JSON you send (use the `samples/purchase.json` template).
 ---
+
 
 
 

@@ -201,3 +201,4 @@ Create an **SQS trigger** (event source mapping) from your queue to this functio
 
 
 
+

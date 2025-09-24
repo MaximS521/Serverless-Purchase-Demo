@@ -164,6 +164,7 @@ Create an **SQS trigger** (event source mapping) from your queue to this functio
 const API_URL = "https://YOUR_API_ID.execute-api.YOUR_REGION.amazonaws.com/dev/productpurchase";
 ```
 5.Upload frontend/index.html to the bucket root.
+
 6.Visit the bucket website endpoint; submit a record from the page.
 
 ---
@@ -189,6 +190,7 @@ const API_URL = "https://YOUR_API_ID.execute-api.YOUR_REGION.amazonaws.com/dev/p
 - Open logs for **Lambda #1**; confirm the function is invoked by SQS.
 - Validate the JSON you send (use the `samples/purchase.json` template).
 ---
+
 
 
 

@@ -160,12 +160,10 @@ Create an **SQS trigger** (event source mapping) from your queue to this functio
 2. Enable **static website hosting**; set index to `index.html`.
 3. Allow **public read** to objects (bucket policy) – see `s3/frontend-bucket-policy.json` for a canonical pattern.
 4. Open `frontend/index.html` and set your API URL:
-
 ```
 const API_URL = "https://YOUR_API_ID.execute-api.YOUR_REGION.amazonaws.com/dev/productpurchase";
 ```
 5.Upload frontend/index.html to the bucket root.
-
 6.Visit the bucket website endpoint; submit a record from the page.
 
 ---
@@ -191,6 +189,7 @@ const API_URL = "https://YOUR_API_ID.execute-api.YOUR_REGION.amazonaws.com/dev/p
 - Open logs for **Lambda #1**; confirm the function is invoked by SQS.
 - Validate the JSON you send (use the `samples/purchase.json` template).
 ---
+
 
 
 

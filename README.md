@@ -38,33 +38,26 @@ Browser (S3 static website)
 ## Repository Layout
 
 backend/
-
-lambda1-queue-consumer/ # SQS → DynamoDB
-
-    └─ main.py
-
-lambda2-api-producer/ # API → SQS
-
-    └─ main.py
+├─ lambda1-queue-consumer/      # SQS → DynamoDB
+│  └─ main.py
+├─ lambda2-api-producer/        # API → SQS
+│  └─ main.py
 
 frontend/
-
-    └─ index.html # Static site (S3)
+└─ index.html                   # Static site (S3)
 
 infra/
-
-    iam/
-      ├─ lambda-policy.json # example IAM policy (reference)
-      └─ trust-lambda.json # example trust policy (reference)
+└─ iam/
+   ├─ lambda-policy.json        # example IAM policy (reference)
+   └─ trust-lambda.json         # example trust policy (reference)
 
 s3/
-
-    ├─ frontend-bucket-policy.json # example public read (reference)
-    └─ site.json # S3 website config (index suffix)
+├─ frontend-bucket-policy.json  # example public read (reference)
+└─ site.json                    # S3 website config (index suffix)
 
 samples/
+└─ purchase.json                # example request body
 
-    └─ purchase.json # example request body
 
 **Note**  
 > The files under `infra/` and `s3/` are **examples** meant to guide your config.  
@@ -201,5 +194,6 @@ const API_URL = "https://YOUR_API_ID.execute-api.YOUR_REGION.amazonaws.com/dev/p
 - Open logs for **Lambda #1**; confirm the function is invoked by SQS.
 - Validate the JSON you send (use the `samples/purchase.json` template).
 ---
+
 
 

@@ -14,11 +14,17 @@ All cloud identifiers are **placeholders** and must be provided from your own AW
 ## Architecture
 
 Browser (S3 static website)
+
 └─> PUT {APIGW_BASE_URL}/{APIGW_PATH}
+
 └─> Amazon API Gateway (proxy)
+
 └─> Lambda #2: lambda2-api-producer (API → SQS)
+
 └─> Amazon SQS (queue)
+
 └─> Lambda #1: lambda1-queue-consumer (SQS → DynamoDB)
+
 └─> Amazon DynamoDB (table)
 
 
@@ -183,3 +189,4 @@ const API_URL = "https://YOUR_API_ID.execute-api.YOUR_REGION.amazonaws.com/dev/p
 - Open logs for **Lambda #1**; confirm the function is invoked by SQS.
 - Validate the JSON you send (use the `samples/purchase.json` template).
 ---
+
